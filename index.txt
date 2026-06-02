@@ -2097,7 +2097,7 @@ function updateRow(id) {
     sourceLink.style.display = "inline-block";
     
     // 設定跳轉網址 (支援自訂的精確搜尋字 searchKey)
-    const targetPage = "https://ch20006313.github.io/Assessment-system/%E5%B1%8F%E6%9D%B1%E8%BE%B2%E4%BD%9C%E7%89%A9(114%E5%B9%B4%E7%89%88)%E9%99%84%E8%A1%A8%E4%B8%80%E4%BA%8C%E4%B8%89.html";
+    const targetPage = "屏東農作物(114年版)附表一二三.html";
     const searchText = item.searchKey || item.crop; 
     const priceText = document.getElementById(`price${id}`).innerText;
 // 將作物名稱與單價一起塞進網址傳送
