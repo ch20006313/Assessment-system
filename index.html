@@ -13,6 +13,80 @@
     input[type="number"], input[type="text"] { width: 100px; }
     .header, .footer { margin: 20px 0; }
     .address { width: 600px !important; }
+
+    /* --- 懸浮按鈕群組樣式 (收納優化) --- */
+    .fab-container {
+      position: fixed;
+      bottom: 30px;
+      right: 30px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 15px;
+      z-index: 9999;
+    }
+    .fab-menu {
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+      opacity: 0;
+      pointer-events: none;
+      transform: translateY(20px);
+      transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+    }
+    .fab-container.active .fab-menu {
+      opacity: 1;
+      pointer-events: auto;
+      transform: translateY(0);
+    }
+    .fab-btn {
+      width: 60px;
+      height: 60px;
+      border-radius: 50%;
+      border: none;
+      color: white;
+      font-size: 14px;
+      font-weight: bold;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+      cursor: pointer;
+      transition: transform 0.2s, background-color 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      line-height: 1.2;
+    }
+    .fab-btn:hover { transform: scale(1.05); }
+
+    /* 按鈕獨立配色 */
+    .fab-btn.main-fab { background-color: #343a40; font-size: 16px; }
+    .fab-btn.main-fab:hover { background-color: #23272b; }
+    
+    .fab-btn.undo { background-color: #007bff; }
+    .fab-btn.undo:hover { background-color: #0056b3; }
+    
+    .fab-btn.redo { background-color: #fd7e14; }
+    .fab-btn.redo:hover { background-color: #e86e04; }
+
+    .fab-btn.delete { background-color: #dc3545; }
+    .fab-btn.delete:hover { background-color: #c82333; }
+    
+    .fab-btn.compare { background-color: #17a2b8; }
+    .fab-btn.compare:hover { background-color: #138496; }
+
+    .fab-btn.calc { background-color: #28a745; }
+    .fab-btn.calc:hover { background-color: #218838; }
+
+    /* 列內操作按鈕樣式 */
+    .del-row-btn {
+      background-color: #dc3545;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      padding: 5px 10px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+    .del-row-btn:hover { background-color: #c82333; }
   </style>
 </head>
 <body>
@@ -45,6 +119,12 @@
     </table>
   </div>
   
+  <div style="margin: 10px 0; text-align: right;">
+    <label style="font-weight: bold;">總種植面積(㎡)：
+      <input type="number" id="totalPlantingArea" step="0.01" style="width: 120px; font-size: 14px;">
+    </label>
+  </div>
+  
   <table id="surveyTable">
     <thead>
       <tr>
@@ -59,11 +139,10 @@
         <th>補償成數</th>
         <th>補償金額(元)</th>
         <th>備註</th>
+        <th class="no-export action-col" style="display:none; width: 100px;">操作</th>
       </tr>
     </thead>
-
     <tbody id="tableBody"></tbody>
-
     <tfoot>
       <tr>
         <td colspan="3">合計</td>
@@ -75,27 +154,37 @@
         <td></td>
         <td id="sumComp">0</td>
         <td></td>
+        <td class="no-export action-col" style="display:none;"></td>
       </tr>
     </tfoot>
   </table>
 
   <button id="addRowBtn" onclick="addRow()">新增一列</button>
 
+  <div class="fab-container" onmouseenter="showFab()" onmouseleave="hideFabTimer()">
+    <div class="fab-menu" id="fabMenu">
+      <button class="fab-btn undo" onclick="undoAction()" title="復原">復原</button>
+      <button class="fab-btn redo" onclick="redoAction()" title="取消復原">取消復原</button>
+      <button class="fab-btn delete" onclick="toggleDeleteMode()">刪除</button>
+      <button class="fab-btn compare" onclick="toggleCompareMode()">比照</button>
+      <button class="fab-btn calc" onclick="calculateOverplanting()">計算<br>超植</button>
+    </div>
+    <button class="fab-btn main-fab">選單</button>
+  </div>
+
 <script>
 /* -----------------------------
-   Firebase 初始化（compat 版）
+   Firebase 初始化
 ------------------------------ */
 const firebaseConfig = {
   apiKey: "AIzaSyCUMG1Tzww-P0hTLwNjXyymDBV9qRGfWkE",
   authDomain: "project-2742725407046120625.firebaseapp.com",
   projectId: "project-2742725407046120625",
-  storageBucket: "project-2742725407046120625.firebasestorage.app", // 已修正為新版網址
+  storageBucket: "project-2742725407046120625.firebasestorage.app", 
   messagingSenderId: "808776926851",
   appId: "1:808776926851:web:b945deae01c459a338fdb6",
   measurementId: "G-Q3GQP53CCJ"
 };
-
-// 初始化 Firebase（compat）
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 
@@ -104,7 +193,7 @@ const db = firebase.firestore();
 ------------------------------ */
 const cropDB = [
   { crop: "檸檬", grade: "特小(1-2cm)", unit: "株", unitArea: 10, price: 110 },
-      { crop: "檸檬", grade: "小(2.1-3.5cm)", unit: "株", unitArea: 10, price: 1210 },
+  { crop: "檸檬", grade: "小(2.1-3.5cm)", unit: "株", unitArea: 10, price: 1210 },
       { crop: "檸檬", grade: "中(3.6-5cm)", unit: "株", unitArea: 10, price: 1320 },
       { crop: "檸檬", grade: "大(5.1-7cm)", unit: "株", unitArea: 10, price: 2420 },
       { crop: "檸檬", grade: "特大(7.1cm以上)", unit: "株", unitArea: 10, price: 3630 },
@@ -2008,20 +2097,177 @@ const cropDB = [
       { crop: "西洋杜鵑", grade: "45公分以上", unit: "株", unitArea: 0.2, price: 363 },
       { crop: "西洋杜鵑", grade: "35公分以上未滿45公分", unit: "株", unitArea: 0.14, price: 230 },
       { crop: "西洋杜鵑", grade: "25公分以上未滿35公分", unit: "株", unitArea: 0.1, price: 133 },
-      { crop: "西洋杜鵑", grade: "15公分以上未滿25公分", unit: "株", unitArea: 0.07, price: 97 },
-      { crop: "西洋杜鵑", grade: "7公分以上未滿15公分", unit: "株", unitArea: 0.05, price: 61 },
+  { crop: "西洋杜鵑", grade: "15公分以上未滿25公分", unit: "株", unitArea: 0.07, price: 97 },
+  { crop: "西洋杜鵑", grade: "7公分以上未滿15公分", unit: "株", unitArea: 0.05, price: 61 },
   { crop: "西洋杜鵑", grade: "未滿7公分", unit: "株", unitArea: 0.04, price: 24 }
 ];
 
 let rowCount = 0;
 
 /* -----------------------------
+   FAB 懸浮選單 3 秒自動隱藏邏輯
+------------------------------ */
+let fabTimeout;
+function showFab() {
+  clearTimeout(fabTimeout);
+  document.querySelector('.fab-container').classList.add('active');
+}
+function hideFabTimer() {
+  fabTimeout = setTimeout(() => {
+    document.querySelector('.fab-container').classList.remove('active');
+  }, 3000);
+}
+
+/* -----------------------------
+   刪除與比照模式開關控制
+------------------------------ */
+let isDeleteMode = false;
+let isCompareMode = false;
+
+function toggleDeleteMode() {
+  isDeleteMode = !isDeleteMode;
+  document.querySelectorAll('.action-col').forEach(el => el.style.display = (isDeleteMode || isCompareMode) ? '' : 'none');
+  document.querySelectorAll('.del-row-btn').forEach(el => el.style.display = isDeleteMode ? 'inline-block' : 'none');
+}
+
+function toggleCompareMode() {
+  if (!isCompareMode) {
+    isCompareMode = true;
+    document.querySelectorAll('.action-col').forEach(el => el.style.display = '');
+    document.querySelectorAll('.compare-input').forEach(el => el.style.display = 'inline-block');
+  } else {
+    saveState();
+    for (let i = 1; i <= rowCount; i++) {
+      const compareInput = document.getElementById(`compare${i}`);
+      const cropInput = document.getElementById(`crop${i}`);
+      const baseCropInput = document.getElementById(`baseCrop${i}`);
+      
+      if (compareInput && cropInput && compareInput.style.display !== 'none') {
+        const compareVal = compareInput.value.trim();
+        if (compareVal !== '') {
+          if (!baseCropInput.value) {
+            baseCropInput.value = cropInput.value; 
+          }
+          const temp = cropInput.value;
+          cropInput.value = compareInput.value;
+          compareInput.value = temp;
+          
+          if (cropInput.value !== baseCropInput.value) {
+            cropInput.readOnly = true;
+            cropInput.style.backgroundColor = "#f0f0f0";
+            const sourceLink = document.getElementById(`sourceLink${i}`);
+            if(sourceLink) sourceLink.style.display = 'none';
+          } else {
+            cropInput.readOnly = false;
+            cropInput.style.backgroundColor = "";
+            updateRow(i); 
+          }
+        }
+      }
+    }
+    isCompareMode = false;
+    document.querySelectorAll('.compare-input').forEach(el => el.style.display = 'none');
+    if (!isDeleteMode) {
+      document.querySelectorAll('.action-col').forEach(el => el.style.display = 'none');
+    }
+  }
+}
+
+function removeSpecificRow(id) {
+  saveState();
+  const row = document.getElementById(`row${id}`);
+  if (row) {
+    row.remove();
+    updateSum();
+  }
+}
+
+/* -----------------------------
+   狀態歷史紀錄（復原與取消復原）
+------------------------------ */
+let historyStack = [];
+let redoStack = [];
+
+function getCurrentState() {
+  const state = [];
+  for (let i = 1; i <= rowCount; i++) {
+    const cropEl = document.getElementById(`crop${i}`);
+    if (!cropEl) continue; 
+    
+    state.push({
+      crop: cropEl.value,
+      baseCrop: document.getElementById(`baseCrop${i}`).value,
+      compare: document.getElementById(`compare${i}`).value,
+      grade: document.getElementById(`grade${i}`).value,
+      qty: document.getElementById(`qty${i}`).value,
+      note: document.getElementById(`note${i}`).value
+    });
+  }
+  return state;
+}
+
+function saveState() {
+  historyStack.push(getCurrentState());
+  if (historyStack.length > 20) historyStack.shift(); 
+  redoStack = []; 
+}
+
+function restoreState(state) {
+  document.getElementById("tableBody").innerHTML = "";
+  rowCount = 0;
+  isDeleteMode = false;
+  isCompareMode = false;
+  document.querySelectorAll('.action-col').forEach(el => el.style.display = 'none');
+
+  state.forEach(data => {
+    addRow(false);
+    const i = rowCount;
+    document.getElementById(`crop${i}`).value = data.crop;
+    document.getElementById(`baseCrop${i}`).value = data.baseCrop || "";
+    document.getElementById(`compare${i}`).value = data.compare || "";
+    
+    if (data.baseCrop && data.crop !== data.baseCrop) {
+        document.getElementById(`crop${i}`).readOnly = true;
+        document.getElementById(`crop${i}`).style.backgroundColor = "#f0f0f0";
+    }
+
+    updateGradeOptions(i);
+    document.getElementById(`grade${i}`).value = data.grade;
+    document.getElementById(`qty${i}`).value = data.qty;
+    document.getElementById(`note${i}`).value = data.note;
+    updateRow(i); 
+  });
+  updateSum(); 
+}
+
+function undoAction() {
+  if (historyStack.length === 0) { alert("已經是最早的狀態了！"); return; }
+  redoStack.push(getCurrentState());
+  const previousState = historyStack.pop();
+  restoreState(previousState);
+}
+
+function redoAction() {
+  if (redoStack.length === 0) { alert("沒有可以重做的步驟！"); return; }
+  historyStack.push(getCurrentState());
+  const nextState = redoStack.pop();
+  restoreState(nextState);
+}
+
+/* -----------------------------
    新增一列
 ------------------------------ */
-function addRow() {
+function addRow(recordState = true) {
+  if (recordState) saveState(); 
+  
   rowCount++;
   const tbody = document.getElementById("tableBody");
   const row = document.createElement("tr");
+  row.id = `row${rowCount}`;
+
+  const showActionCol = (isDeleteMode || isCompareMode) ? "" : "display:none;";
+  const showDelBtn = isDeleteMode ? "inline-block" : "none";
+  const showCompare = isCompareMode ? "inline-block" : "none";
 
   row.innerHTML = `
     <td>${rowCount}</td>
@@ -2039,21 +2285,27 @@ function addRow() {
     <td>100%</td>
     <td id="comp${rowCount}">0</td>
     <td><input type="text" id="note${rowCount}"></td>
+    <td class="no-export action-col" style="${showActionCol}">
+      <input type="hidden" id="baseCrop${rowCount}">
+      <button class="del-row-btn" style="display:${showDelBtn};" onclick="removeSpecificRow(${rowCount})">x</button>
+      <input type="text" id="compare${rowCount}" class="compare-input" placeholder="替換品項名" style="display:${showCompare}; width:80px;">
+    </td>
   `;
   tbody.appendChild(row);
 }
 
 /* -----------------------------
-   更新等級選項
+   更新等級與資料
 ------------------------------ */
 function updateGradeOptions(id) {
-  const cropName = document.getElementById(`crop${id}`).value.trim();
-  const gradeSelect = document.getElementById(`grade${id}`);
+  const baseCropInput = document.getElementById(`baseCrop${id}`);
+  const cropEl = document.getElementById(`crop${id}`);
+  const isSwapped = (baseCropInput && baseCropInput.value && cropEl.value !== baseCropInput.value);
+  const cropName = isSwapped ? baseCropInput.value.trim() : cropEl.value.trim();
   
-  // 重置下拉選單
+  const gradeSelect = document.getElementById(`grade${id}`);
   gradeSelect.innerHTML = "<option value=''>選擇</option>";
 
-  // 取得對應作物的等級並產生選項
   const grades = cropDB.filter(d => d.crop === cropName).map(d => d.grade);
   grades.forEach(g => {
     const opt = document.createElement("option");
@@ -2062,86 +2314,86 @@ function updateGradeOptions(id) {
     gradeSelect.appendChild(opt);
   });
 
-  // 【關鍵修正 1】：只要修改了作物名稱，在還沒選定等級前，一律隱藏連結！
   document.getElementById(`sourceLink${id}`).style.display = "none";
-
-  // 連帶觸發 updateRow 來清空後方的單價與金額
   updateRow(id);
 }
-/* -----------------------------
-   更新單列資料與來源連結
------------------------------- */
+
 function updateRow(id) {
-  const crop = document.getElementById(`crop${id}`).value.trim();
+  const baseCropInput = document.getElementById(`baseCrop${id}`);
+  const cropEl = document.getElementById(`crop${id}`);
+  if(!cropEl) return;
+
+  const isSwapped = (baseCropInput && baseCropInput.value && cropEl.value !== baseCropInput.value);
+  const crop = isSwapped ? baseCropInput.value.trim() : cropEl.value.trim();
+  
   const grade = document.getElementById(`grade${id}`).value;
   const qty = parseFloat(document.getElementById(`qty${id}`).value) || 0;
-  
   const sourceLink = document.getElementById(`sourceLink${id}`);
-
-  // 在資料庫中尋找完全符合「作物名稱」與「等級」的項目
+  
   const item = cropDB.find(d => d.crop === crop && d.grade === grade);
 
   if (item) {
-    // 【成功找到單價】：填入金額，並「顯示」連結
     document.getElementById(`price${id}`).innerText = item.price.toLocaleString();
     document.getElementById(`unit${id}`).innerText = item.unit;
 
-    const area = Math.round(qty * item.unitArea);
+    // 將面積計算四捨五入至小數點第二位
+    const area = Math.round(qty * item.unitArea * 100) / 100;
     const amount = Math.round(qty * item.price);
 
-    document.getElementById(`area${id}`).innerText = area.toLocaleString();
+    // 套用小數點第二位顯示格式
+    document.getElementById(`area${id}`).innerText = area.toLocaleString(undefined, { maximumFractionDigits: 2 });
     document.getElementById(`amount${id}`).innerText = amount.toLocaleString();
     document.getElementById(`comp${id}`).innerText = amount.toLocaleString();
 
-    // 顯示連結
-    sourceLink.style.display = "inline-block";
-    
-    // 設定跳轉網址 (支援自訂的精確搜尋字 searchKey)
-    const targetPage = "https://ch20006313.github.io/Assessment-system/%E5%B1%8F%E6%9D%B1%E8%BE%B2%E4%BD%9C%E7%89%A9(114%E5%B9%B4%E7%89%88)%E9%99%84%E8%A1%A8%E4%B8%80%E4%BA%8C%E4%B8%89.html";
-    const searchText = item.searchKey || item.crop; 
-    const priceText = document.getElementById(`price${id}`).innerText;
-// 將作物名稱與單價一起塞進網址傳送
-    sourceLink.href = `${targetPage}?search=${encodeURIComponent(searchText)}&price=${encodeURIComponent(priceText)}`;
-
+    if (!isSwapped) {
+      sourceLink.style.display = "inline-block";
+      const targetPage = "https://ch20006313.github.io/Assessment-system/%E5%B1%8F%E6%9D%B1%E8%BE%B2%E4%BD%9C%E7%89%A9(114%E5%B9%B4%E7%89%88)%E9%99%84%E8%A1%A8%E4%B8%80%E4%BA%8C%E4%B8%89.html";
+      const searchText = item.searchKey || item.crop; 
+      const priceText = document.getElementById(`price${id}`).innerText;
+      sourceLink.href = `${targetPage}?search=${encodeURIComponent(searchText)}&price=${encodeURIComponent(priceText)}`;
+    } else {
+      sourceLink.style.display = "none";
+    }
   } else {
-    // 【找不到單價】(或回到"選擇"狀態)：清空數值，並「隱藏」連結
     document.getElementById(`price${id}`).innerText = "";
     document.getElementById(`unit${id}`).innerText = "";
     document.getElementById(`area${id}`).innerText = "0";
     document.getElementById(`amount${id}`).innerText = "0";
     document.getElementById(`comp${id}`).innerText = "0";
-    
-    // 隱藏連結
     sourceLink.style.display = "none";
   }
-
   updateSum();
 }
 
-/* -----------------------------
-   更新合計
------------------------------- */
 function updateSum() {
   let sumArea = 0, sumAmount = 0, sumComp = 0;
   for (let i = 1; i <= rowCount; i++) {
-    sumArea += parseFloat(document.getElementById(`area${i}`).innerText.replace(/,/g, "")) || 0;
+    const areaEl = document.getElementById(`area${i}`);
+    if(!areaEl) continue; 
+    sumArea += parseFloat(areaEl.innerText.replace(/,/g, "")) || 0;
     sumAmount += parseFloat(document.getElementById(`amount${i}`).innerText.replace(/,/g, "")) || 0;
     sumComp += parseFloat(document.getElementById(`comp${i}`).innerText.replace(/,/g, "")) || 0;
   }
-
-  document.getElementById("sumArea").innerText = sumArea.toLocaleString();
+  
+  // 總計也進行小數點第二位的四捨五入與格式化
+  sumArea = Math.round(sumArea * 100) / 100;
+  document.getElementById("sumArea").innerText = sumArea.toLocaleString(undefined, { maximumFractionDigits: 2 });
   document.getElementById("sumAmount").innerText = sumAmount.toLocaleString();
   document.getElementById("sumComp").innerText = sumComp.toLocaleString();
 }
 
 /* -----------------------------
-   收集表單資料（準備上傳雲端）
+   雲端資料互動
 ------------------------------ */
 function collectFormData() {
   const crops = [];
   for (let i = 1; i <= rowCount; i++) {
+    const cropEl = document.getElementById(`crop${i}`);
+    if(!cropEl) continue;
     crops.push({
-      crop: document.getElementById(`crop${i}`).value,
+      crop: cropEl.value,
+      baseCrop: document.getElementById(`baseCrop${i}`).value,
+      compare: document.getElementById(`compare${i}`).value,
       grade: document.getElementById(`grade${i}`).value,
       qty: document.getElementById(`qty${i}`).value,
       unit: document.getElementById(`unit${i}`).innerText,
@@ -2152,7 +2404,6 @@ function collectFormData() {
       note: document.getElementById(`note${i}`).value
     });
   }
-
   return {
     docId: document.getElementById("docId").value,
     ownerName: document.querySelector(".name").value,
@@ -2163,59 +2414,47 @@ function collectFormData() {
   };
 }
 
-/* -----------------------------
-   儲存到雲端（新增或覆蓋）
------------------------------- */
 async function saveToCloud() {
   const data = collectFormData();
-  if(!data.docId) {
-      alert("請先輸入編號！");
-      return;
-  }
+  if(!data.docId) { alert("請先輸入編號！"); return; }
   try {
     await db.collection("surveys").doc(data.docId).set(data);
     alert("已儲存到雲端！");
-  } catch(e) {
-    alert("儲存失敗：" + e.message);
-  }
+  } catch(e) { alert("儲存失敗：" + e.message); }
 }
 
-/* -----------------------------
-   從雲端讀取資料
------------------------------- */
 async function loadFromCloud() {
   const docId = document.getElementById("docId").value;
-  if(!docId) {
-      alert("請先輸入編號！");
-      return;
-  }
+  if(!docId) { alert("請先輸入編號！"); return; }
   
   try {
     const docSnap = await db.collection("surveys").doc(docId).get();
-    if (!docSnap.exists) {
-      alert("找不到此編號的資料！");
-      return;
-    }
+    if (!docSnap.exists) { alert("找不到此編號的資料！"); return; }
 
     const data = docSnap.data();
+    saveState();
 
-    // 填入個人資料
     document.querySelector(".name").value = data.ownerName || "";
     document.querySelectorAll(".name")[1].value = data.landOwnerName || "";
     document.querySelector(".phone").value = data.phone || "";
     document.querySelector(".address").value = data.address || "";
 
-    // 清空表格
     document.getElementById("tableBody").innerHTML = "";
     rowCount = 0;
     
-    // 填入作物資料
     if (data.crops && data.crops.length > 0) {
         data.crops.forEach(crop => {
-            addRow();
+            addRow(false);
             const i = rowCount;
-
             document.getElementById(`crop${i}`).value = crop.crop;
+            document.getElementById(`baseCrop${i}`).value = crop.baseCrop || "";
+            document.getElementById(`compare${i}`).value = crop.compare || "";
+            
+            if (crop.baseCrop && crop.crop !== crop.baseCrop) {
+                document.getElementById(`crop${i}`).readOnly = true;
+                document.getElementById(`crop${i}`).style.backgroundColor = "#f0f0f0";
+            }
+
             updateGradeOptions(i);
             document.getElementById(`grade${i}`).value = crop.grade;
             document.getElementById(`qty${i}`).value = crop.qty;
@@ -2225,90 +2464,70 @@ async function loadFromCloud() {
             document.getElementById(`amount${i}`).innerText = crop.amount;
             document.getElementById(`comp${i}`).innerText = crop.comp;
             document.getElementById(`note${i}`).value = crop.note;
+            updateRow(i);
         });
     }
     updateSum();
     alert("已讀取雲端資料！");
-  } catch(e) {
-    alert("讀取失敗：" + e.message);
-  }
+  } catch(e) { alert("讀取失敗：" + e.message); }
 }
 
-/* -----------------------------
-   更新雲端資料（必須已存在）
------------------------------- */
 async function updateCloud() {
   const data = collectFormData();
-  if(!data.docId) {
-      alert("請先輸入編號！");
-      return;
-  }
+  if(!data.docId) { alert("請先輸入編號！"); return; }
   try {
     await db.collection("surveys").doc(data.docId).update(data);
     alert("已更新雲端資料！");
-  } catch (e) {
-    alert("更新失敗，可能是該編號尚未建立過資料。");
-  }
+  } catch (e) { alert("更新失敗，可能是該編號尚未建立過資料。"); }
 }
 
 /* -----------------------------
-   匯出 Excel（新增 A欄寬度與自動換行、個人資料字體 12pt）
+   匯出 Excel 
 ------------------------------ */
 function exportToExcel() {
   const docId = document.getElementById("docId").value.trim() || "未命名";
   const filename = docId + ".xls";
 
-  // 1. 複製目前的 body，避免改動到真實網頁畫面
   const clonedBody = document.body.cloneNode(true);
   
-  // 2. 對應替換 input, select, textarea 為 span
-  const originalInputs = document.body.querySelectorAll("input, select, textarea");
-  const clonedInputs = clonedBody.querySelectorAll("input, select, textarea");
+  clonedBody.querySelectorAll('.no-export, script, button, .fab-container').forEach(el => el.remove());
+
+  const originalInputs = document.body.querySelectorAll("input:not([type='hidden']), select, textarea");
+  const clonedInputs = clonedBody.querySelectorAll("input:not([type='hidden']), select, textarea");
 
   originalInputs.forEach((el, index) => {
     const clonedEl = clonedInputs[index];
+    if(!clonedEl) return;
     const span = document.createElement("span");
-    
-    // 取得使用者輸入的值
     span.textContent = el.value.trim();
     span.style.display = "inline-block";
     
-    // 【修改點 1】：判斷該輸入框是否在「個人資料表格」內，設定特定字體大小
     if (el.closest('#PersonaldataTable')) {
-        span.style.fontSize = "12pt"; // 姓名、身分證、住址等固定為 12
+        span.style.fontSize = "12pt"; 
     } else {
-        span.style.fontSize = "11pt"; // 其他預設維持 11
+        span.style.fontSize = "11pt"; 
     }
-    
     clonedEl.replaceWith(span);
   });
 
-  // 【修改點 2】：強制設定 A 欄 (表格的第一個欄位) 的寬度為約 40px，並自動換行
   const surveyRows = clonedBody.querySelectorAll('#surveyTable tr');
   surveyRows.forEach(row => {
       if (row.cells.length > 0) {
-          const firstCell = row.cells[0]; // 取得第一個儲存格 (A 欄)
+          const firstCell = row.cells[0]; 
           firstCell.style.width = "40px";
           firstCell.style.minWidth = "40px";
           firstCell.style.maxWidth = "40px";
-          firstCell.style.wordWrap = "break-word";  // 允許長單字換行
-          firstCell.style.whiteSpace = "normal";    // 允許一般文字換行
+          firstCell.style.wordWrap = "break-word";  
+          firstCell.style.whiteSpace = "normal";    
       }
   });
 
-  // 3. 把複製出來的標籤中的按鈕、script 刪除，讓 Excel 畫面保持乾淨
-  clonedBody.querySelectorAll("script, button").forEach(el => el.remove());
-
-  // 4. 組裝成完整的 HTML 字串
   const html = `
     <html>
     <head>
       <meta charset="UTF-8">
       <style>
-        body, table, td, th, span {
-          font-size: 11pt;
-          font-family: "Microsoft JhengHei", sans-serif;
-        }
+        body, table, td, th, span { font-size: 11pt; font-family: "Microsoft JhengHei", sans-serif; }
         table { border-collapse: collapse; width: 100%; }
         th, td { border: 1px solid #000; padding: 11px; text-align: center; }
       </style>
@@ -2317,7 +2536,6 @@ function exportToExcel() {
     </html>
   `;
 
-  // 5. 建立 Excel Blob 並觸發下載
   const blob = new Blob(['\ufeff' + html], { type: "application/vnd.ms-excel" });
   const link = document.createElement("a");
   link.href = URL.createObjectURL(blob);
@@ -2327,6 +2545,130 @@ function exportToExcel() {
   document.body.removeChild(link);
 }
 
+/* -----------------------------
+   計算超植與重新排序
+------------------------------ */
+function calculateOverplanting() {
+  const totalAreaInput = document.getElementById('totalPlantingArea').value;
+  if (!totalAreaInput) { alert("請輸入總種植面積！"); return; }
+  
+  saveState(); 
+
+  let remainingArea = parseFloat(totalAreaInput);
+  let rowData = [];
+  
+  for (let i = 1; i <= rowCount; i++) {
+    const cropEl = document.getElementById(`crop${i}`);
+    if (!cropEl) continue; 
+    
+    const baseCropInput = document.getElementById(`baseCrop${i}`);
+    const actualCrop = (baseCropInput && baseCropInput.value && cropEl.value !== baseCropInput.value) ? baseCropInput.value.trim() : cropEl.value.trim();
+    
+    const grade = document.getElementById(`grade${i}`).value;
+    const qty = parseFloat(document.getElementById(`qty${i}`).value) || 0;
+    const note = document.getElementById(`note${i}`).value.trim();
+    
+    if (!actualCrop || !grade || qty <= 0) continue; 
+    
+    const item = cropDB.find(d => d.crop === actualCrop && d.grade === grade);
+    if (!item) {
+        alert(`無法比對到作物「${actualCrop} - ${grade}」的資料，將不參與計算。`);
+        continue;
+    }
+    
+    const valuePerArea = item.price / item.unitArea;
+    rowData.push({
+      crop: cropEl.value.trim(),
+      baseCrop: baseCropInput ? baseCropInput.value : "",
+      compare: document.getElementById(`compare${i}`).value,
+      grade: grade,
+      qty: qty,
+      note: note,
+      unitArea: item.unitArea,
+      valuePerArea: valuePerArea
+    });
+  }
+  
+  rowData.sort((a, b) => b.valuePerArea - a.valuePerArea);
+  
+  let finalRows = [];
+  let isOverplantingTriggered = false; // 【防呆標記】是否已經發生過超植
+
+  for (let data of rowData) {
+    // 若前方高價值品項已經發生超植，後方所有品項直接標記超植
+    if (isOverplantingTriggered) {
+       finalRows.push({
+          ...data,
+          note: data.note ? data.note + " 超植" : "超植",
+          isOver: true
+       });
+       continue;
+    }
+
+    let requiredAreaPerUnit = data.unitArea;
+    let maxValidQty = Math.floor((remainingArea + 0.000001) / requiredAreaPerUnit);
+    
+    if (maxValidQty >= data.qty) {
+      // 數量全部合規
+      finalRows.push({ ...data, isOver: false });
+      remainingArea -= data.qty * requiredAreaPerUnit;
+    } else if (maxValidQty > 0) {
+      // 部分合規，部分超植
+      finalRows.push({ ...data, qty: maxValidQty, isOver: false });
+      finalRows.push({
+         ...data,
+         qty: data.qty - maxValidQty,
+         note: data.note ? data.note + " 超植" : "超植",
+         isOver: true
+      });
+      remainingArea -= maxValidQty * requiredAreaPerUnit;
+      isOverplantingTriggered = true; // 觸發鎖定
+    } else {
+      // 全部超植
+      finalRows.push({
+         ...data,
+         note: data.note ? data.note + " 超植" : "超植",
+         isOver: true
+      });
+      isOverplantingTriggered = true; // 觸發鎖定
+    }
+  }
+  
+  document.getElementById("tableBody").innerHTML = "";
+  rowCount = 0;
+  isDeleteMode = false;
+  isCompareMode = false;
+  document.querySelectorAll('.action-col').forEach(el => el.style.display = 'none');
+  
+  finalRows.forEach(data => {
+    addRow(false);
+    const i = rowCount;
+    document.getElementById(`crop${i}`).value = data.crop;
+    document.getElementById(`baseCrop${i}`).value = data.baseCrop || "";
+    document.getElementById(`compare${i}`).value = data.compare || "";
+    
+    if (data.baseCrop && data.crop !== data.baseCrop) {
+        document.getElementById(`crop${i}`).readOnly = true;
+        document.getElementById(`crop${i}`).style.backgroundColor = "#f0f0f0";
+    }
+
+    updateGradeOptions(i);
+    document.getElementById(`grade${i}`).value = data.grade;
+    document.getElementById(`qty${i}`).value = data.qty;
+    document.getElementById(`note${i}`).value = data.note;
+    
+    updateRow(i);
+    
+    // 將超植項目的數據歸零
+    if (data.isOver) {
+      document.getElementById(`price${i}`).innerText = "0";
+      document.getElementById(`area${i}`).innerText = "0";
+      document.getElementById(`amount${i}`).innerText = "0";
+      document.getElementById(`comp${i}`).innerText = "0";
+    }
+  });
+  updateSum();
+}
 </script>
 </body>
 </html>
