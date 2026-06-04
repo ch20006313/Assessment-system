@@ -2746,20 +2746,34 @@ function exportToExcel() {
 
   const clonedBody = document.body.cloneNode(true);
   
-  clonedBody.querySelectorAll('.no-export, script, button, .fab-container, .sys-fab-container, .autocomplete-items').forEach(el => el.remove());
-
+  // 【關鍵修正】：先進行 Input 轉換為 Span，確保兩邊 DOM 節點順序完全一致
   const originalInputs = document.body.querySelectorAll("input:not([type='hidden']), select, textarea");
   const clonedInputs = clonedBody.querySelectorAll("input:not([type='hidden']), select, textarea");
 
   originalInputs.forEach((el, index) => {
     const clonedEl = clonedInputs[index];
     if(!clonedEl) return;
+    
     const span = document.createElement("span");
-    span.textContent = el.value.trim();
+    
+    // 針對不同類型的輸入框做更精確的值擷取
+    let displayValue = el.value.trim();
+    if (el.tagName === 'SELECT') {
+      // 確保下拉選單匯出的是「顯示的文字」而非 value
+      displayValue = el.options[el.selectedIndex]?.text || '';
+    } else if (el.type === 'checkbox' || el.type === 'radio') {
+      // 若有核取方塊，匯出為符號以利辨識
+      displayValue = el.checked ? '☑' : '☐';
+    }
+
+    span.textContent = displayValue;
     span.style.display = "inline-block";
     span.style.fontSize = el.closest('#PersonaldataTable') ? "12pt" : "11pt"; 
     clonedEl.replaceWith(span);
   });
+
+  // 【關鍵修正】：轉換成純文字完成後，再統一刪除帶有 .no-export 等不需要匯出的元素
+  clonedBody.querySelectorAll('.no-export, script, button, .fab-container, .sys-fab-container, .autocomplete-items').forEach(el => el.remove());
 
   const surveyRows = clonedBody.querySelectorAll('#surveyTable tr');
   surveyRows.forEach(row => {
