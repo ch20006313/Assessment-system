@@ -14,7 +14,91 @@
     .header, .footer { margin: 20px 0; }
     .address { width: 600px !important; }
 
-    /* --- 懸浮按鈕群組樣式 (收納優化) --- */
+    input:focus, select:focus { outline: none; }
+
+    /* --- 自訂智能搜尋下拉選單 (Autocomplete) --- */
+    .autocomplete-items {
+      position: absolute;
+      border: 1px solid #ddd; 
+      border-radius: 4px;
+      z-index: 9999;
+      max-height: 200px;
+      overflow-y: auto;
+      background-color: #fff;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      text-align: left;
+      min-width: 140px; 
+    }
+    .autocomplete-items div {
+      padding: 8px 10px;
+      cursor: pointer;
+      border-bottom: 1px solid #eee;
+      font-size: 14px;
+      color: #333;
+    }
+    .autocomplete-items div:hover { background-color: #f1f1f1; }
+    .autocomplete-items div:last-child { border-bottom: none; }
+
+    /* --- 懸浮按鈕透明度設定 (全域) --- */
+    .sys-fab-btn, .fab-btn {
+      opacity: 0.7; /* ★ 在這裡設定透明度：0(完全透明) ~ 1(不透明) */
+    }
+    .sys-fab-btn:hover, .fab-btn:hover {
+      opacity: 1; /* 滑鼠移入時恢復不透明 */
+    }
+
+    /* --- 左上角：系統功能懸浮按鈕群組 --- */
+    .sys-fab-container {
+      position: fixed;
+      top: 11px;
+      left: 11px;
+      display: flex;
+      align-items: center;
+      z-index: 9999;
+    }
+    .sys-fab-menu {
+      display: flex;
+      gap: 10px;
+      opacity: 0;
+      pointer-events: none;
+      position: absolute;
+      left: 70px;
+      transform: translateX(-10px);
+      transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+    }
+    .sys-fab-container.active .sys-fab-menu {
+      opacity: 1;
+      pointer-events: auto;
+      transform: translateX(0);
+    }
+    .sys-fab-btn {
+      width: 55px;
+      height: 55px;
+      border-radius: 8px; 
+      border: none;
+      color: white;
+      font-size: 13px;
+      font-weight: bold;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+      cursor: pointer;
+      transition: transform 0.2s, background-color 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      line-height: 1.2;
+      text-align: center;
+    }
+    .sys-fab-btn:hover { transform: scale(1.05); }
+    .sys-fab-btn.main-fab { background-color: #343a40; font-size: 14px; width: 60px; height: 60px; z-index: 2; }
+
+    /* 系統功能獨立配色 */
+    .sys-fab-btn.btn-save { background-color: #0d6efd; }
+    .sys-fab-btn.btn-load { background-color: #20c997; }
+    .sys-fab-btn.btn-update { background-color: #fd7e14; }
+    .sys-fab-btn.btn-export { background-color: #198754; }
+    .sys-fab-btn.btn-import { background-color: #6f42c1; }
+
+    /* --- 右下角：操作懸浮按鈕群組 --- */
     .fab-container {
       position: fixed;
       bottom: 30px;
@@ -22,7 +106,6 @@
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 15px;
       z-index: 9999;
     }
     .fab-menu {
@@ -31,6 +114,8 @@
       gap: 15px;
       opacity: 0;
       pointer-events: none;
+      position: absolute;
+      bottom: 75px; 
       transform: translateY(20px);
       transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
     }
@@ -57,24 +142,14 @@
     }
     .fab-btn:hover { transform: scale(1.05); }
 
-    /* 按鈕獨立配色 */
+    /* 操作選單獨立配色 */
     .fab-btn.main-fab { background-color: #343a40; font-size: 16px; }
-    .fab-btn.main-fab:hover { background-color: #23272b; }
-    
     .fab-btn.undo { background-color: #007bff; }
-    .fab-btn.undo:hover { background-color: #0056b3; }
-    
     .fab-btn.redo { background-color: #fd7e14; }
-    .fab-btn.redo:hover { background-color: #e86e04; }
-
     .fab-btn.delete { background-color: #dc3545; }
-    .fab-btn.delete:hover { background-color: #c82333; }
-    
     .fab-btn.compare { background-color: #17a2b8; }
-    .fab-btn.compare:hover { background-color: #138496; }
-
     .fab-btn.calc { background-color: #28a745; }
-    .fab-btn.calc:hover { background-color: #218838; }
+    .fab-btn.comp { background-color: #e83e8c; } /* 粉紅色：補償成數按鈕 */
 
     /* 列內操作按鈕樣式 */
     .del-row-btn {
@@ -91,10 +166,20 @@
 </head>
 <body>
 
-  <button onclick="saveToCloud()">儲存到雲端</button>
-  <button onclick="loadFromCloud()">讀取雲端</button>
-  <button onclick="updateCloud()">更新雲端</button>
-  <button onclick="exportToExcel()">匯出 Excel</button>
+  <datalist id="cropDataList"></datalist>
+
+  <div class="sys-fab-container" onmouseenter="showSysFab()" onmouseleave="hideSysFabTimer()">
+    <div class="sys-fab-menu" id="sysFabMenu">
+      <button class="sys-fab-btn btn-save" onclick="saveToCloud()">儲存<br>雲端</button>
+      <button class="sys-fab-btn btn-load" onclick="loadFromCloud()">讀取<br>雲端</button>
+      <button class="sys-fab-btn btn-update" onclick="updateCloud()">更新<br>雲端</button>
+      <button class="sys-fab-btn btn-export" onclick="exportToExcel()">匯出<br>EXCEL</button>
+      <button class="sys-fab-btn btn-import" onclick="document.getElementById('importExcelInput').click()">匯入<br>EXCEL</button>
+    </div>
+    <button class="sys-fab-btn main-fab">系統<br>功能</button>
+  </div>
+  
+  <input type="file" id="importExcelInput" style="display:none;" accept=".xls,.html" onchange="importFromExcel(event)">
 
   <div style="position:absolute; top:11px; right:11px;">
     編號：<input type="text" id="docId">
@@ -136,7 +221,18 @@
         <th>單位</th>
         <th>單價(元)</th>
         <th>金額(元)</th>
-        <th>補償成數</th>
+        <th>補償成數
+          <div id="compBatchContainer" class="no-export" style="display:none; font-size:12px; font-weight:normal; margin-top:4px; padding: 4px; background: #f8f9fa; border: 1px solid #ccc; border-radius: 4px;">
+            <label style="cursor:pointer; display:block; margin-bottom:2px;">
+              <input type="checkbox" id="compBatchCheck" onchange="applyBatchComp()">全部修改
+            </label>
+            <select id="compBatchSelect" onchange="applyBatchComp()" style="width:100%; height:22px;">
+              <option value="100%">100%</option>
+              <option value="50%">50%</option>
+              <option value="0%">0%</option>
+            </select>
+          </div>
+        </th>
         <th>補償金額(元)</th>
         <th>備註</th>
         <th class="no-export action-col" style="display:none; width: 100px;">操作</th>
@@ -164,9 +260,10 @@
   <div class="fab-container" onmouseenter="showFab()" onmouseleave="hideFabTimer()">
     <div class="fab-menu" id="fabMenu">
       <button class="fab-btn undo" onclick="undoAction()" title="復原">復原</button>
-      <button class="fab-btn redo" onclick="redoAction()" title="取消復原">取消復原</button>
+      <button class="fab-btn redo" onclick="redoAction()" title="取消復原">取消<br>復原</button>
       <button class="fab-btn delete" onclick="toggleDeleteMode()">刪除</button>
       <button class="fab-btn compare" onclick="toggleCompareMode()">比照</button>
+      <button class="fab-btn comp" onclick="toggleCompMode()">補償<br>成數</button>
       <button class="fab-btn calc" onclick="calculateOverplanting()">計算<br>超植</button>
     </div>
     <button class="fab-btn main-fab">選單</button>
@@ -2104,9 +2201,65 @@ const cropDB = [
 
 let rowCount = 0;
 
+window.addEventListener('load', () => {
+  saveState(); 
+});
+
 /* -----------------------------
-   FAB 懸浮選單 3 秒自動隱藏邏輯
+   即時智能搜尋邏輯 (Autocomplete)
 ------------------------------ */
+function showAutocomplete(inputId, listId, callbackId) {
+  const inputEl = document.getElementById(inputId);
+  const listEl = document.getElementById(listId);
+  if (!inputEl || !listEl) return;
+  
+  const val = inputEl.value.trim();
+  listEl.innerHTML = '';
+  
+  const uniqueCrops = [...new Set(cropDB.map(d => d.crop))];
+  const matchedCrops = uniqueCrops.filter(c => c.includes(val));
+
+  matchedCrops.forEach(cropName => {
+    const itemDiv = document.createElement("div");
+    if (val) {
+      const regex = new RegExp(`(${val})`, "gi");
+      itemDiv.innerHTML = cropName.replace(regex, "<strong style='color:#000;'>$1</strong>");
+    } else {
+      itemDiv.innerHTML = cropName;
+    }
+    
+    itemDiv.onclick = function(e) {
+      e.stopPropagation(); 
+      inputEl.value = cropName;
+      listEl.innerHTML = '';
+      if (callbackId !== undefined) {
+         updateGradeOptions(callbackId); 
+      }
+      saveState(); 
+    };
+    listEl.appendChild(itemDiv);
+  });
+}
+
+document.addEventListener("click", function(e) {
+  if (e.target.tagName === 'INPUT' && (e.target.id.startsWith('crop') || e.target.id.startsWith('compare'))) return;
+  document.querySelectorAll('.autocomplete-items').forEach(list => list.innerHTML = '');
+});
+
+/* -----------------------------
+   FAB 懸浮選單顯示邏輯
+------------------------------ */
+let sysFabTimeout;
+function showSysFab() {
+  clearTimeout(sysFabTimeout);
+  document.querySelector('.sys-fab-container').classList.add('active');
+}
+function hideSysFabTimer() {
+  sysFabTimeout = setTimeout(() => {
+    document.querySelector('.sys-fab-container').classList.remove('active');
+  }, 3000);
+}
+
 let fabTimeout;
 function showFab() {
   clearTimeout(fabTimeout);
@@ -2118,16 +2271,41 @@ function hideFabTimer() {
   }, 3000);
 }
 
+function recalcPhotoNumbers() {
+  const rows = document.querySelectorAll('#tableBody tr');
+  let counter = 1;
+  rows.forEach(row => { row.cells[0].textContent = counter++; });
+}
+
 /* -----------------------------
-   刪除與比照模式開關控制
+   刪除、比照、補償成數模式控制
 ------------------------------ */
 let isDeleteMode = false;
 let isCompareMode = false;
+let isCompMode = false;
+
+// 防呆：在執行特殊動作（如匯出、計算）前關閉所有編輯模式
+function closeAllModes() {
+  if (isDeleteMode) toggleDeleteMode();
+  if (isCompareMode) toggleCompareMode();
+  if (isCompMode) toggleCompMode();
+}
 
 function toggleDeleteMode() {
   isDeleteMode = !isDeleteMode;
   document.querySelectorAll('.action-col').forEach(el => el.style.display = (isDeleteMode || isCompareMode) ? '' : 'none');
   document.querySelectorAll('.del-row-btn').forEach(el => el.style.display = isDeleteMode ? 'inline-block' : 'none');
+  if (!isDeleteMode) recalcPhotoNumbers();
+}
+
+function removeSpecificRow(id) {
+  const row = document.getElementById(`row${id}`);
+  if (row) {
+    row.remove();
+    recalcPhotoNumbers();
+    updateSum();
+    saveState();
+  }
 }
 
 function toggleCompareMode() {
@@ -2136,18 +2314,14 @@ function toggleCompareMode() {
     document.querySelectorAll('.action-col').forEach(el => el.style.display = '');
     document.querySelectorAll('.compare-input').forEach(el => el.style.display = 'inline-block');
   } else {
-    saveState();
     for (let i = 1; i <= rowCount; i++) {
       const compareInput = document.getElementById(`compare${i}`);
       const cropInput = document.getElementById(`crop${i}`);
       const baseCropInput = document.getElementById(`baseCrop${i}`);
-      
       if (compareInput && cropInput && compareInput.style.display !== 'none') {
         const compareVal = compareInput.value.trim();
         if (compareVal !== '') {
-          if (!baseCropInput.value) {
-            baseCropInput.value = cropInput.value; 
-          }
+          if (!baseCropInput.value) baseCropInput.value = cropInput.value; 
           const temp = cropInput.value;
           cropInput.value = compareInput.value;
           compareInput.value = temp;
@@ -2167,23 +2341,61 @@ function toggleCompareMode() {
     }
     isCompareMode = false;
     document.querySelectorAll('.compare-input').forEach(el => el.style.display = 'none');
-    if (!isDeleteMode) {
-      document.querySelectorAll('.action-col').forEach(el => el.style.display = 'none');
+    if (!isDeleteMode) document.querySelectorAll('.action-col').forEach(el => el.style.display = 'none');
+    saveState(); 
+  }
+}
+
+// 切換補償成數編輯模式
+function toggleCompMode() {
+  if (!isCompMode) {
+    isCompMode = true;
+    document.getElementById('compBatchContainer').style.display = 'block';
+    for (let i = 1; i <= rowCount; i++) {
+      const textEl = document.getElementById(`compRateText${i}`);
+      const selectEl = document.getElementById(`compRateSelect${i}`);
+      if (textEl && selectEl) {
+        selectEl.value = textEl.innerText;
+        textEl.style.display = 'none';
+        selectEl.style.display = 'inline-block';
+      }
+    }
+  } else {
+    for (let i = 1; i <= rowCount; i++) {
+      const textEl = document.getElementById(`compRateText${i}`);
+      const selectEl = document.getElementById(`compRateSelect${i}`);
+      if (textEl && selectEl) {
+        textEl.innerText = selectEl.value;
+        selectEl.style.display = 'none';
+        textEl.style.display = 'inline-block';
+        updateRow(i);
+      }
+    }
+    document.getElementById('compBatchContainer').style.display = 'none';
+    document.getElementById('compBatchCheck').checked = false; 
+    isCompMode = false;
+    saveState();
+  }
+}
+
+// 補償成數批次修改邏輯
+function applyBatchComp() {
+  const check = document.getElementById('compBatchCheck');
+  const select = document.getElementById('compBatchSelect');
+  if (check.checked) {
+    const val = select.value;
+    for (let i = 1; i <= rowCount; i++) {
+      const selectEl = document.getElementById(`compRateSelect${i}`);
+      if (selectEl && selectEl.style.display !== 'none') {
+        selectEl.value = val;
+        updateRow(i);
+      }
     }
   }
 }
 
-function removeSpecificRow(id) {
-  saveState();
-  const row = document.getElementById(`row${id}`);
-  if (row) {
-    row.remove();
-    updateSum();
-  }
-}
-
 /* -----------------------------
-   狀態歷史紀錄（復原與取消復原）
+   狀態歷史紀錄（完美復原機制）
 ------------------------------ */
 let historyStack = [];
 let redoStack = [];
@@ -2194,30 +2406,56 @@ function getCurrentState() {
     const cropEl = document.getElementById(`crop${i}`);
     if (!cropEl) continue; 
     
+    let compRateVal = "100%";
+    const rateSelectEl = document.getElementById(`compRateSelect${i}`);
+    if (rateSelectEl && rateSelectEl.style.display !== 'none') {
+        compRateVal = rateSelectEl.value;
+    } else if (document.getElementById(`compRateText${i}`)) {
+        compRateVal = document.getElementById(`compRateText${i}`).innerText;
+    }
+
     state.push({
       crop: cropEl.value,
       baseCrop: document.getElementById(`baseCrop${i}`).value,
       compare: document.getElementById(`compare${i}`).value,
       grade: document.getElementById(`grade${i}`).value,
       qty: document.getElementById(`qty${i}`).value,
+      compRate: compRateVal,
       note: document.getElementById(`note${i}`).value
     });
   }
-  return state;
+  return { rows: state, area: document.getElementById('totalPlantingArea').value };
 }
 
 function saveState() {
-  historyStack.push(getCurrentState());
-  if (historyStack.length > 20) historyStack.shift(); 
+  const currentState = getCurrentState();
+  const currentStr = JSON.stringify(currentState);
+  if (historyStack.length > 0) {
+    if (currentStr === JSON.stringify(historyStack[historyStack.length - 1])) return;
+  }
+  historyStack.push(currentState);
+  if (historyStack.length > 30) historyStack.shift(); 
   redoStack = []; 
 }
 
-function restoreState(state) {
+document.addEventListener('change', function(e) {
+  if(e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') {
+    // 避免在批次勾選時重複觸發
+    if(e.target.id === 'compBatchCheck' || e.target.id === 'compBatchSelect') return;
+    saveState();
+  }
+});
+
+function restoreState(stateObj) {
+  const state = stateObj.rows;
+  document.getElementById('totalPlantingArea').value = stateObj.area || "";
   document.getElementById("tableBody").innerHTML = "";
   rowCount = 0;
   isDeleteMode = false;
   isCompareMode = false;
+  isCompMode = false;
   document.querySelectorAll('.action-col').forEach(el => el.style.display = 'none');
+  document.getElementById('compBatchContainer').style.display = 'none';
 
   state.forEach(data => {
     addRow(false);
@@ -2226,6 +2464,9 @@ function restoreState(state) {
     document.getElementById(`baseCrop${i}`).value = data.baseCrop || "";
     document.getElementById(`compare${i}`).value = data.compare || "";
     
+    document.getElementById(`compRateText${i}`).innerText = data.compRate || "100%";
+    document.getElementById(`compRateSelect${i}`).value = data.compRate || "100%";
+
     if (data.baseCrop && data.crop !== data.baseCrop) {
         document.getElementById(`crop${i}`).readOnly = true;
         document.getElementById(`crop${i}`).style.backgroundColor = "#f0f0f0";
@@ -2237,20 +2478,20 @@ function restoreState(state) {
     document.getElementById(`note${i}`).value = data.note;
     updateRow(i); 
   });
+  recalcPhotoNumbers();
   updateSum(); 
 }
 
 function undoAction() {
-  if (historyStack.length === 0) { alert("已經是最早的狀態了！"); return; }
-  redoStack.push(getCurrentState());
-  const previousState = historyStack.pop();
-  restoreState(previousState);
+  if (historyStack.length <= 1) { alert("已經是最早的狀態了！"); return; }
+  redoStack.push(historyStack.pop()); 
+  restoreState(historyStack[historyStack.length - 1]); 
 }
 
 function redoAction() {
   if (redoStack.length === 0) { alert("沒有可以重做的步驟！"); return; }
-  historyStack.push(getCurrentState());
   const nextState = redoStack.pop();
+  historyStack.push(nextState);
   restoreState(nextState);
 }
 
@@ -2258,8 +2499,6 @@ function redoAction() {
    新增一列
 ------------------------------ */
 function addRow(recordState = true) {
-  if (recordState) saveState(); 
-  
   rowCount++;
   const tbody = document.getElementById("tableBody");
   const row = document.createElement("tr");
@@ -2268,13 +2507,21 @@ function addRow(recordState = true) {
   const showActionCol = (isDeleteMode || isCompareMode) ? "" : "display:none;";
   const showDelBtn = isDeleteMode ? "inline-block" : "none";
   const showCompare = isCompareMode ? "inline-block" : "none";
+  const showCompSelect = isCompMode ? "inline-block" : "none";
+  const showCompText = isCompMode ? "none" : "inline-block";
 
   row.innerHTML = `
-    <td>${rowCount}</td>
+    <td></td> 
     <td>
-      <input type="text" id="crop${rowCount}" oninput="updateGradeOptions(${rowCount})">
+      <div style="position: relative; display: inline-block;">
+        <input type="text" id="crop${rowCount}" autocomplete="off" placeholder="請輸入作名..." 
+          oninput="showAutocomplete('crop${rowCount}', 'cropList${rowCount}', ${rowCount}); updateGradeOptions(${rowCount})" 
+          onfocus="showAutocomplete('crop${rowCount}', 'cropList${rowCount}', ${rowCount})" 
+          onclick="showAutocomplete('crop${rowCount}', 'cropList${rowCount}', ${rowCount})">
+        <div id="cropList${rowCount}" class="autocomplete-items" style="top:100%; left:0; right:0;"></div>
+      </div>
       <br>
-      <a id="sourceLink${rowCount}" href="#" target="_blank" style="display:none; font-size:12px; color:#0066cc; text-decoration:none; margin-top:4px;">🔍 查看來源</a>
+      <a id="sourceLink${rowCount}" class="no-export" href="#" target="_blank" style="display:none; font-size:12px; color:#0066cc; text-decoration:none; margin-top:4px;">🔍 查看來源</a>
     </td>
     <td><select id="grade${rowCount}" onchange="updateRow(${rowCount})"><option value="">選擇</option></select></td>
     <td id="area${rowCount}">0</td>
@@ -2282,20 +2529,35 @@ function addRow(recordState = true) {
     <td id="unit${rowCount}"></td>
     <td id="price${rowCount}"></td>
     <td id="amount${rowCount}">0</td>
-    <td>100%</td>
+    <td>
+      <span id="compRateText${rowCount}" style="display:${showCompText};">100%</span>
+      <select id="compRateSelect${rowCount}" class="no-export comp-rate-select" style="display:${showCompSelect};" onchange="updateRow(${rowCount})">
+        <option value="100%">100%</option>
+        <option value="50%">50%</option>
+        <option value="0%">0%</option>
+      </select>
+    </td>
     <td id="comp${rowCount}">0</td>
     <td><input type="text" id="note${rowCount}"></td>
     <td class="no-export action-col" style="${showActionCol}">
       <input type="hidden" id="baseCrop${rowCount}">
       <button class="del-row-btn" style="display:${showDelBtn};" onclick="removeSpecificRow(${rowCount})">x</button>
-      <input type="text" id="compare${rowCount}" class="compare-input" placeholder="替換品項名" style="display:${showCompare}; width:80px;">
+      <div style="position:relative; display:inline-block;">
+        <input type="text" id="compare${rowCount}" class="compare-input" placeholder="替換品項名" style="display:${showCompare}; width:80px;" autocomplete="off" 
+          oninput="showAutocomplete('compare${rowCount}', 'compareList${rowCount}')" 
+          onfocus="showAutocomplete('compare${rowCount}', 'compareList${rowCount}')" 
+          onclick="showAutocomplete('compare${rowCount}', 'compareList${rowCount}')">
+        <div id="compareList${rowCount}" class="autocomplete-items" style="top:100%; left:0; right:0; min-width:120px;"></div>
+      </div>
     </td>
   `;
   tbody.appendChild(row);
+  recalcPhotoNumbers();
+  if (recordState) saveState(); 
 }
 
 /* -----------------------------
-   更新等級與資料
+   更新等級與金額 (加入成數計算)
 ------------------------------ */
 function updateGradeOptions(id) {
   const baseCropInput = document.getElementById(`baseCrop${id}`);
@@ -2330,20 +2592,27 @@ function updateRow(id) {
   const qty = parseFloat(document.getElementById(`qty${id}`).value) || 0;
   const sourceLink = document.getElementById(`sourceLink${id}`);
   
-  const item = cropDB.find(d => d.crop === crop && d.grade === grade);
+  const item = cropDB.find(d => d.crop === crop && (d.grade === grade || !d.grade));
 
   if (item) {
     document.getElementById(`price${id}`).innerText = item.price.toLocaleString();
     document.getElementById(`unit${id}`).innerText = item.unit;
 
-    // 將面積計算四捨五入至小數點第二位
     const area = Math.round(qty * item.unitArea * 100) / 100;
     const amount = Math.round(qty * item.price);
 
-    // 套用小數點第二位顯示格式
+    // 取得補償成數值進行計算
+    let compRateVal = 1;
+    const rateSelectEl = document.getElementById(`compRateSelect${id}`);
+    const rateStr = (rateSelectEl && rateSelectEl.style.display !== 'none') ? rateSelectEl.value : document.getElementById(`compRateText${id}`).innerText;
+    if (rateStr === "50%") compRateVal = 0.5;
+    if (rateStr === "0%") compRateVal = 0;
+    
+    const compAmount = Math.round(amount * compRateVal);
+
     document.getElementById(`area${id}`).innerText = area.toLocaleString(undefined, { maximumFractionDigits: 2 });
     document.getElementById(`amount${id}`).innerText = amount.toLocaleString();
-    document.getElementById(`comp${id}`).innerText = amount.toLocaleString();
+    document.getElementById(`comp${id}`).innerText = compAmount.toLocaleString();
 
     if (!isSwapped) {
       sourceLink.style.display = "inline-block";
@@ -2374,8 +2643,6 @@ function updateSum() {
     sumAmount += parseFloat(document.getElementById(`amount${i}`).innerText.replace(/,/g, "")) || 0;
     sumComp += parseFloat(document.getElementById(`comp${i}`).innerText.replace(/,/g, "")) || 0;
   }
-  
-  // 總計也進行小數點第二位的四捨五入與格式化
   sumArea = Math.round(sumArea * 100) / 100;
   document.getElementById("sumArea").innerText = sumArea.toLocaleString(undefined, { maximumFractionDigits: 2 });
   document.getElementById("sumAmount").innerText = sumAmount.toLocaleString();
@@ -2386,6 +2653,7 @@ function updateSum() {
    雲端資料互動
 ------------------------------ */
 function collectFormData() {
+  closeAllModes(); // 儲存前關閉操作狀態
   const crops = [];
   for (let i = 1; i <= rowCount; i++) {
     const cropEl = document.getElementById(`crop${i}`);
@@ -2400,6 +2668,7 @@ function collectFormData() {
       price: document.getElementById(`price${i}`).innerText,
       area: document.getElementById(`area${i}`).innerText,
       amount: document.getElementById(`amount${i}`).innerText,
+      compRate: document.getElementById(`compRateText${i}`).innerText,
       comp: document.getElementById(`comp${i}`).innerText,
       note: document.getElementById(`note${i}`).value
     });
@@ -2417,23 +2686,18 @@ function collectFormData() {
 async function saveToCloud() {
   const data = collectFormData();
   if(!data.docId) { alert("請先輸入編號！"); return; }
-  try {
-    await db.collection("surveys").doc(data.docId).set(data);
-    alert("已儲存到雲端！");
-  } catch(e) { alert("儲存失敗：" + e.message); }
+  try { await db.collection("surveys").doc(data.docId).set(data); alert("已儲存到雲端！"); } 
+  catch(e) { alert("儲存失敗：" + e.message); }
 }
 
 async function loadFromCloud() {
   const docId = document.getElementById("docId").value;
   if(!docId) { alert("請先輸入編號！"); return; }
-  
   try {
     const docSnap = await db.collection("surveys").doc(docId).get();
     if (!docSnap.exists) { alert("找不到此編號的資料！"); return; }
 
     const data = docSnap.data();
-    saveState();
-
     document.querySelector(".name").value = data.ownerName || "";
     document.querySelectorAll(".name")[1].value = data.landOwnerName || "";
     document.querySelector(".phone").value = data.phone || "";
@@ -2441,6 +2705,7 @@ async function loadFromCloud() {
 
     document.getElementById("tableBody").innerHTML = "";
     rowCount = 0;
+    isCompMode = false; document.getElementById('compBatchContainer').style.display = 'none';
     
     if (data.crops && data.crops.length > 0) {
         data.crops.forEach(crop => {
@@ -2449,6 +2714,8 @@ async function loadFromCloud() {
             document.getElementById(`crop${i}`).value = crop.crop;
             document.getElementById(`baseCrop${i}`).value = crop.baseCrop || "";
             document.getElementById(`compare${i}`).value = crop.compare || "";
+            document.getElementById(`compRateText${i}`).innerText = crop.compRate || "100%";
+            document.getElementById(`compRateSelect${i}`).value = crop.compRate || "100%";
             
             if (crop.baseCrop && crop.crop !== crop.baseCrop) {
                 document.getElementById(`crop${i}`).readOnly = true;
@@ -2458,16 +2725,13 @@ async function loadFromCloud() {
             updateGradeOptions(i);
             document.getElementById(`grade${i}`).value = crop.grade;
             document.getElementById(`qty${i}`).value = crop.qty;
-            document.getElementById(`unit${i}`).innerText = crop.unit;
-            document.getElementById(`price${i}`).innerText = crop.price;
-            document.getElementById(`area${i}`).innerText = crop.area;
-            document.getElementById(`amount${i}`).innerText = crop.amount;
-            document.getElementById(`comp${i}`).innerText = crop.comp;
             document.getElementById(`note${i}`).value = crop.note;
             updateRow(i);
         });
     }
+    recalcPhotoNumbers();
     updateSum();
+    saveState(); 
     alert("已讀取雲端資料！");
   } catch(e) { alert("讀取失敗：" + e.message); }
 }
@@ -2475,22 +2739,21 @@ async function loadFromCloud() {
 async function updateCloud() {
   const data = collectFormData();
   if(!data.docId) { alert("請先輸入編號！"); return; }
-  try {
-    await db.collection("surveys").doc(data.docId).update(data);
-    alert("已更新雲端資料！");
-  } catch (e) { alert("更新失敗，可能是該編號尚未建立過資料。"); }
+  try { await db.collection("surveys").doc(data.docId).update(data); alert("已更新雲端資料！"); } 
+  catch (e) { alert("更新失敗，可能是該編號尚未建立過資料。"); }
 }
 
 /* -----------------------------
-   匯出 Excel 
+   匯出 / 匯入 Excel 
 ------------------------------ */
 function exportToExcel() {
+  closeAllModes(); // 匯出前強制關閉所有控制介面，確保畫面乾淨
   const docId = document.getElementById("docId").value.trim() || "未命名";
   const filename = docId + ".xls";
 
   const clonedBody = document.body.cloneNode(true);
   
-  clonedBody.querySelectorAll('.no-export, script, button, .fab-container').forEach(el => el.remove());
+  clonedBody.querySelectorAll('.no-export, script, button, .fab-container, .sys-fab-container, .autocomplete-items').forEach(el => el.remove());
 
   const originalInputs = document.body.querySelectorAll("input:not([type='hidden']), select, textarea");
   const clonedInputs = clonedBody.querySelectorAll("input:not([type='hidden']), select, textarea");
@@ -2501,12 +2764,7 @@ function exportToExcel() {
     const span = document.createElement("span");
     span.textContent = el.value.trim();
     span.style.display = "inline-block";
-    
-    if (el.closest('#PersonaldataTable')) {
-        span.style.fontSize = "12pt"; 
-    } else {
-        span.style.fontSize = "11pt"; 
-    }
+    span.style.fontSize = el.closest('#PersonaldataTable') ? "12pt" : "11pt"; 
     clonedEl.replaceWith(span);
   });
 
@@ -2524,16 +2782,12 @@ function exportToExcel() {
 
   const html = `
     <html>
-    <head>
-      <meta charset="UTF-8">
-      <style>
+    <head><meta charset="UTF-8"><style>
         body, table, td, th, span { font-size: 11pt; font-family: "Microsoft JhengHei", sans-serif; }
         table { border-collapse: collapse; width: 100%; }
         th, td { border: 1px solid #000; padding: 11px; text-align: center; }
-      </style>
-    </head>
-    <body>${clonedBody.innerHTML}</body>
-    </html>
+    </style></head>
+    <body>${clonedBody.innerHTML}</body></html>
   `;
 
   const blob = new Blob(['\ufeff' + html], { type: "application/vnd.ms-excel" });
@@ -2545,6 +2799,63 @@ function exportToExcel() {
   document.body.removeChild(link);
 }
 
+function importFromExcel(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(e.target.result, 'text/html');
+
+    const docIdSpan = doc.querySelector('div[style*="absolute"] span');
+    if (docIdSpan) document.getElementById('docId').value = docIdSpan.textContent;
+    const areaSpan = doc.querySelector('div[style*="margin"] span');
+    if (areaSpan) document.getElementById('totalPlantingArea').value = areaSpan.textContent;
+
+    const personalSpans = doc.querySelectorAll('#PersonaldataTable span');
+    const personalInputs = document.querySelectorAll('#PersonaldataTable input');
+    for(let i=0; i<Math.min(personalSpans.length, personalInputs.length); i++) {
+        personalInputs[i].value = personalSpans[i].textContent;
+    }
+
+    document.getElementById('tableBody').innerHTML = '';
+    rowCount = 0;
+    const rows = doc.querySelectorAll('#surveyTable tbody tr');
+    
+    rows.forEach(row => {
+      const cells = row.querySelectorAll('td');
+      if (cells.length >= 11) {
+        addRow(false);
+        const i = rowCount;
+        const cropSpan = cells[1].querySelector('span');
+        const gradeSpan = cells[2].querySelector('span');
+        const qtySpan = cells[4].querySelector('span');
+        const compRateSpan = cells[8].querySelector('span'); // 第8欄是補償成數
+        const noteSpan = cells[10].querySelector('span');
+
+        if(cropSpan) document.getElementById(`crop${i}`).value = cropSpan.textContent;
+        updateGradeOptions(i);
+        if(gradeSpan) document.getElementById(`grade${i}`).value = gradeSpan.textContent;
+        if(qtySpan) document.getElementById(`qty${i}`).value = qtySpan.textContent;
+        
+        if(compRateSpan) {
+            document.getElementById(`compRateText${i}`).innerText = compRateSpan.textContent;
+            document.getElementById(`compRateSelect${i}`).value = compRateSpan.textContent;
+        }
+        
+        if(noteSpan) document.getElementById(`note${i}`).value = noteSpan.textContent;
+        updateRow(i);
+      }
+    });
+    
+    recalcPhotoNumbers();
+    saveState(); 
+    alert('匯入成功！');
+    event.target.value = ''; 
+  };
+  reader.readAsText(file);
+}
+
 /* -----------------------------
    計算超植與重新排序
 ------------------------------ */
@@ -2552,8 +2863,8 @@ function calculateOverplanting() {
   const totalAreaInput = document.getElementById('totalPlantingArea').value;
   if (!totalAreaInput) { alert("請輸入總種植面積！"); return; }
   
-  saveState(); 
-
+  closeAllModes(); // 覆蓋畫面之前關閉編輯狀態
+  
   let remainingArea = parseFloat(totalAreaInput);
   let rowData = [];
   
@@ -2566,11 +2877,12 @@ function calculateOverplanting() {
     
     const grade = document.getElementById(`grade${i}`).value;
     const qty = parseFloat(document.getElementById(`qty${i}`).value) || 0;
+    const compRateStr = document.getElementById(`compRateText${i}`).innerText;
     const note = document.getElementById(`note${i}`).value.trim();
     
-    if (!actualCrop || !grade || qty <= 0) continue; 
+    if (!actualCrop || qty <= 0) continue; 
     
-    const item = cropDB.find(d => d.crop === actualCrop && d.grade === grade);
+    const item = cropDB.find(d => d.crop === actualCrop && (d.grade === grade || !d.grade));
     if (!item) {
         alert(`無法比對到作物「${actualCrop} - ${grade}」的資料，將不參與計算。`);
         continue;
@@ -2583,6 +2895,7 @@ function calculateOverplanting() {
       compare: document.getElementById(`compare${i}`).value,
       grade: grade,
       qty: qty,
+      compRate: compRateStr,
       note: note,
       unitArea: item.unitArea,
       valuePerArea: valuePerArea
@@ -2592,16 +2905,11 @@ function calculateOverplanting() {
   rowData.sort((a, b) => b.valuePerArea - a.valuePerArea);
   
   let finalRows = [];
-  let isOverplantingTriggered = false; // 【防呆標記】是否已經發生過超植
+  let isOverplantingTriggered = false; 
 
   for (let data of rowData) {
-    // 若前方高價值品項已經發生超植，後方所有品項直接標記超植
     if (isOverplantingTriggered) {
-       finalRows.push({
-          ...data,
-          note: data.note ? data.note + " 超植" : "超植",
-          isOver: true
-       });
+       finalRows.push({ ...data, note: data.note ? data.note + " 超植" : "超植", isOver: true });
        continue;
     }
 
@@ -2609,36 +2917,21 @@ function calculateOverplanting() {
     let maxValidQty = Math.floor((remainingArea + 0.000001) / requiredAreaPerUnit);
     
     if (maxValidQty >= data.qty) {
-      // 數量全部合規
       finalRows.push({ ...data, isOver: false });
       remainingArea -= data.qty * requiredAreaPerUnit;
     } else if (maxValidQty > 0) {
-      // 部分合規，部分超植
       finalRows.push({ ...data, qty: maxValidQty, isOver: false });
-      finalRows.push({
-         ...data,
-         qty: data.qty - maxValidQty,
-         note: data.note ? data.note + " 超植" : "超植",
-         isOver: true
-      });
+      finalRows.push({ ...data, qty: data.qty - maxValidQty, note: data.note ? data.note + " 超植" : "超植", isOver: true });
       remainingArea -= maxValidQty * requiredAreaPerUnit;
-      isOverplantingTriggered = true; // 觸發鎖定
+      isOverplantingTriggered = true; 
     } else {
-      // 全部超植
-      finalRows.push({
-         ...data,
-         note: data.note ? data.note + " 超植" : "超植",
-         isOver: true
-      });
-      isOverplantingTriggered = true; // 觸發鎖定
+      finalRows.push({ ...data, note: data.note ? data.note + " 超植" : "超植", isOver: true });
+      isOverplantingTriggered = true; 
     }
   }
   
   document.getElementById("tableBody").innerHTML = "";
   rowCount = 0;
-  isDeleteMode = false;
-  isCompareMode = false;
-  document.querySelectorAll('.action-col').forEach(el => el.style.display = 'none');
   
   finalRows.forEach(data => {
     addRow(false);
@@ -2646,6 +2939,8 @@ function calculateOverplanting() {
     document.getElementById(`crop${i}`).value = data.crop;
     document.getElementById(`baseCrop${i}`).value = data.baseCrop || "";
     document.getElementById(`compare${i}`).value = data.compare || "";
+    document.getElementById(`compRateText${i}`).innerText = data.compRate || "100%";
+    document.getElementById(`compRateSelect${i}`).value = data.compRate || "100%";
     
     if (data.baseCrop && data.crop !== data.baseCrop) {
         document.getElementById(`crop${i}`).readOnly = true;
@@ -2659,7 +2954,6 @@ function calculateOverplanting() {
     
     updateRow(i);
     
-    // 將超植項目的數據歸零
     if (data.isOver) {
       document.getElementById(`price${i}`).innerText = "0";
       document.getElementById(`area${i}`).innerText = "0";
@@ -2667,7 +2961,9 @@ function calculateOverplanting() {
       document.getElementById(`comp${i}`).innerText = "0";
     }
   });
+  recalcPhotoNumbers();
   updateSum();
+  saveState(); 
 }
 </script>
 </body>
