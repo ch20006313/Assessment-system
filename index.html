@@ -41,10 +41,10 @@
 
     /* --- 懸浮按鈕透明度設定 (全域) --- */
     .sys-fab-btn, .fab-btn {
-      opacity: 0.7; /* ★ 在這裡設定透明度：0(完全透明) ~ 1(不透明) */
+      opacity: 0.85; 
     }
     .sys-fab-btn:hover, .fab-btn:hover {
-      opacity: 1; /* 滑鼠移入時恢復不透明 */
+      opacity: 1; 
     }
 
     /* --- 左上角：系統功能懸浮按鈕群組 --- */
@@ -91,7 +91,6 @@
     .sys-fab-btn:hover { transform: scale(1.05); }
     .sys-fab-btn.main-fab { background-color: #343a40; font-size: 14px; width: 60px; height: 60px; z-index: 2; }
 
-    /* 系統功能獨立配色 */
     .sys-fab-btn.btn-save { background-color: #0d6efd; }
     .sys-fab-btn.btn-load { background-color: #20c997; }
     .sys-fab-btn.btn-update { background-color: #fd7e14; }
@@ -142,16 +141,14 @@
     }
     .fab-btn:hover { transform: scale(1.05); }
 
-    /* 操作選單獨立配色 */
     .fab-btn.main-fab { background-color: #343a40; font-size: 16px; }
     .fab-btn.undo { background-color: #007bff; }
     .fab-btn.redo { background-color: #fd7e14; }
     .fab-btn.delete { background-color: #dc3545; }
     .fab-btn.compare { background-color: #17a2b8; }
     .fab-btn.calc { background-color: #28a745; }
-    .fab-btn.comp { background-color: #e83e8c; } /* 粉紅色：補償成數按鈕 */
+    .fab-btn.comp { background-color: #e83e8c; }
 
-    /* 列內操作按鈕樣式 */
     .del-row-btn {
       background-color: #dc3545;
       color: white;
@@ -206,7 +203,7 @@
   
   <div style="margin: 10px 0; text-align: right;">
     <label style="font-weight: bold;">總種植面積(㎡)：
-      <input type="number" id="totalPlantingArea" step="0.01" style="width: 120px; font-size: 14px;">
+      <input type="text" id="totalPlantingArea" style="width: 120px; font-size: 14px;">
     </label>
   </div>
   
@@ -2284,7 +2281,6 @@ let isDeleteMode = false;
 let isCompareMode = false;
 let isCompMode = false;
 
-// 防呆：在執行特殊動作（如匯出、計算）前關閉所有編輯模式
 function closeAllModes() {
   if (isDeleteMode) toggleDeleteMode();
   if (isCompareMode) toggleCompareMode();
@@ -2346,7 +2342,6 @@ function toggleCompareMode() {
   }
 }
 
-// 切換補償成數編輯模式
 function toggleCompMode() {
   if (!isCompMode) {
     isCompMode = true;
@@ -2378,7 +2373,6 @@ function toggleCompMode() {
   }
 }
 
-// 補償成數批次修改邏輯
 function applyBatchComp() {
   const check = document.getElementById('compBatchCheck');
   const select = document.getElementById('compBatchSelect');
@@ -2440,7 +2434,6 @@ function saveState() {
 
 document.addEventListener('change', function(e) {
   if(e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') {
-    // 避免在批次勾選時重複觸發
     if(e.target.id === 'compBatchCheck' || e.target.id === 'compBatchSelect') return;
     saveState();
   }
@@ -2525,7 +2518,7 @@ function addRow(recordState = true) {
     </td>
     <td><select id="grade${rowCount}" onchange="updateRow(${rowCount})"><option value="">選擇</option></select></td>
     <td id="area${rowCount}">0</td>
-    <td><input type="number" id="qty${rowCount}" min="0" oninput="updateRow(${rowCount})"></td>
+    <td><input type="text" id="qty${rowCount}" oninput="updateRow(${rowCount})"></td>
     <td id="unit${rowCount}"></td>
     <td id="price${rowCount}"></td>
     <td id="amount${rowCount}">0</td>
@@ -2589,6 +2582,7 @@ function updateRow(id) {
   const crop = isSwapped ? baseCropInput.value.trim() : cropEl.value.trim();
   
   const grade = document.getElementById(`grade${id}`).value;
+  // ★ parseFloat 依然能正確將 type="text" 的數字字串轉為數字
   const qty = parseFloat(document.getElementById(`qty${id}`).value) || 0;
   const sourceLink = document.getElementById(`sourceLink${id}`);
   
@@ -2601,7 +2595,6 @@ function updateRow(id) {
     const area = Math.round(qty * item.unitArea * 100) / 100;
     const amount = Math.round(qty * item.price);
 
-    // 取得補償成數值進行計算
     let compRateVal = 1;
     const rateSelectEl = document.getElementById(`compRateSelect${id}`);
     const rateStr = (rateSelectEl && rateSelectEl.style.display !== 'none') ? rateSelectEl.value : document.getElementById(`compRateText${id}`).innerText;
@@ -2653,7 +2646,7 @@ function updateSum() {
    雲端資料互動
 ------------------------------ */
 function collectFormData() {
-  closeAllModes(); // 儲存前關閉操作狀態
+  closeAllModes(); 
   const crops = [];
   for (let i = 1; i <= rowCount; i++) {
     const cropEl = document.getElementById(`crop${i}`);
@@ -2747,7 +2740,7 @@ async function updateCloud() {
    匯出 / 匯入 Excel 
 ------------------------------ */
 function exportToExcel() {
-  closeAllModes(); // 匯出前強制關閉所有控制介面，確保畫面乾淨
+  closeAllModes(); 
   const docId = document.getElementById("docId").value.trim() || "未命名";
   const filename = docId + ".xls";
 
@@ -2830,7 +2823,7 @@ function importFromExcel(event) {
         const cropSpan = cells[1].querySelector('span');
         const gradeSpan = cells[2].querySelector('span');
         const qtySpan = cells[4].querySelector('span');
-        const compRateSpan = cells[8].querySelector('span'); // 第8欄是補償成數
+        const compRateSpan = cells[8].querySelector('span'); 
         const noteSpan = cells[10].querySelector('span');
 
         if(cropSpan) document.getElementById(`crop${i}`).value = cropSpan.textContent;
@@ -2863,7 +2856,7 @@ function calculateOverplanting() {
   const totalAreaInput = document.getElementById('totalPlantingArea').value;
   if (!totalAreaInput) { alert("請輸入總種植面積！"); return; }
   
-  closeAllModes(); // 覆蓋畫面之前關閉編輯狀態
+  closeAllModes(); 
   
   let remainingArea = parseFloat(totalAreaInput);
   let rowData = [];
